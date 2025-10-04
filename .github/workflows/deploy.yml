@@ -1,4 +1,4 @@
-name: MCP with Role Assumption in Docker
+name: MCP Pipeline with Dynamic AWS Profile in Docker
 
 on:
   push:
@@ -6,49 +6,36 @@ on:
       - main
 
 jobs:
-  run-q:
+  run-q-chat:
     runs-on: ubuntu-latest
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Set up base AWS credentials
+    - name: Build Docker image
+      run: |
+        docker build -t amazonq-pipeline .
+
+    - name: Run container and execute q chat with dynamic AWS profile
       env:
         AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }} # optional
         AWS_REGION: ${{ secrets.AWS_REGION }}
       run: |
-        # Assumes role
-        CREDS=$(aws sts assume-role \
-          --role-arn arn:aws:iam::767398038063:role/testroleformax \
-          --role-session-name github-actions-session)
-        # Parse credentials
-        AWS_ACCESS_KEY_ID=$(echo "$CREDS" | jq -r '.Credentials.AccessKeyId')
-        AWS_SECRET_ACCESS_KEY=$(echo "$CREDS" | jq -r '.Credentials.SecretAccessKey')
-        AWS_SESSION_TOKEN=$(echo "$CREDS" | jq -r '.Credentials.SessionToken')
-        # Export for next steps
-        echo "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID" >> $GITHUB_ENV
-        echo "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY" >> $GITHUB_ENV
-        echo "AWS_SESSION_TOKEN=$AWS_SESSION_TOKEN" >> $GITHUB_ENV
-        echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> $GITHUB_ENV
-
-    - name: Build Docker image
-      run: |
-        docker build -t amazonq-pipeline .
-
-    - name: Run container and execute q chat
-      env:
-        AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
-        AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
-        AWS_SESSION_TOKEN: ${{ env.AWS_SESSION_TOKEN }}
-        AWS_REGION: ${{ secrets.AWS_REGION }}
-      run: |
-        docker run --rm \
-          -v $HOME/.aws:/root/.aws:ro \
+        docker run --rm -i \
           -e AWS_ACCESS_KEY_ID \
           -e AWS_SECRET_ACCESS_KEY \
           -e AWS_SESSION_TOKEN \
           -e AWS_REGION \
-          amazonq-pipeline \
-          q chat
+          -e AWS_PROFILE=myprofile \
+          amazonq-pipeline bash -c "\
+            mkdir -p ~/.aws && \
+            echo '[myprofile]' > ~/.aws/credentials && \
+            echo 'aws_access_key_id=${AWS_ACCESS_KEY_ID}' >> ~/.aws/credentials && \
+            echo 'aws_secret_access_key=${AWS_SECRET_ACCESS_KEY}' >> ~/.aws/credentials && \
+            if [ ! -z \"${AWS_SESSION_TOKEN}\" ]; then echo 'aws_session_token=${AWS_SESSION_TOKEN}' >> ~/.aws/credentials; fi && \
+            echo '[profile myprofile]' > ~/.aws/config && \
+            echo 'region=${AWS_REGION}' >> ~/.aws/config && \
+            /usr/local/bin/q chat"
