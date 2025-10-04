@@ -52,6 +52,13 @@ jobs:
         unzip q.zip
         chmod +x ./q/install.sh
         ./q/install.sh --no-confirm
+    - name: Q CLI login (non-interactive)
+      env:
+         AWS_PROFILE: default
+         AWS_REGION: ${{ secrets.AWS_REGION }}
+      run: |
+        q login --no-confirm
+
     - name: Run q chat
       run: |
        q chat
