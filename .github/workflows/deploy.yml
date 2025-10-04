@@ -1,65 +1,54 @@
-name: AWS MCP Pipeline
+name: MCP with Role Assumption in Docker
 
 on:
   push:
     branches:
-      - main  # or your target branch
-
-permissions:
-  id-token: write   # Required for OIDC authentication
-  contents: read
+      - main
 
 jobs:
-  aws-mcp-job:
+  run-q:
     runs-on: ubuntu-latest
-
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
 
-    - name: Configure AWS credentials via OIDC
-      uses: aws-actions/configure-aws-credentials@v2
-      with:
-        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-        aws-region: ${{ secrets.AWS_REGION }}
-
-    - name: Create .aws/amazonq/mcp.json file
-      run: |
-        mkdir -p ~/.aws/amazonq
-        cat <<EOF > ~/.aws/amazonq/mcp.json
-        {
-          "mcpServers": {
-            "awslabs.billing-cost-management-mcp-server": {
-              "command": "uvx",
-              "args": [
-                "awslabs.billing-cost-management-mcp-server@latest"
-              ],
-              "env": {
-                "FASTMCP_LOG_LEVEL": "ERROR",
-                "AWS_PROFILE": "default",
-                "AWS_REGION": "${{ secrets.AWS_REGION }}"
-              },
-              "disabled": false,
-              "autoApprove": []
-            }
-          }
-        }
-        EOF
-        
-    - name: Download and install Amazon Q CLI
-      run: |
-        curl --proto '=https' --tlsv1.2 -sSf "https://desktop-release.q.us-east-1.amazonaws.com/latest/q-x86_64-linux.zip" -o "q.zip"
-        unzip q.zip
-        chmod +x ./q/install.sh
-        ./q/install.sh --no-confirm
-    - name: Q CLI login (non-interactive)
+    - name: Set up base AWS credentials
       env:
-         AWS_PROFILE: default
-         AWS_REGION: ${{ secrets.AWS_REGION }}
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_SESSION_TOKEN: ${{ secrets.AWS_SESSION_TOKEN }} # optional
+        AWS_REGION: ${{ secrets.AWS_REGION }}
       run: |
-        q login --no-confirm
+        # Assumes role
+        CREDS=$(aws sts assume-role \
+          --role-arn arn:aws:iam::767398038063:role/testroleformax \
+          --role-session-name github-actions-session)
+        # Parse credentials
+        AWS_ACCESS_KEY_ID=$(echo "$CREDS" | jq -r '.Credentials.AccessKeyId')
+        AWS_SECRET_ACCESS_KEY=$(echo "$CREDS" | jq -r '.Credentials.SecretAccessKey')
+        AWS_SESSION_TOKEN=$(echo "$CREDS" | jq -r '.Credentials.SessionToken')
+        # Export for next steps
+        echo "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID" >> $GITHUB_ENV
+        echo "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY" >> $GITHUB_ENV
+        echo "AWS_SESSION_TOKEN=$AWS_SESSION_TOKEN" >> $GITHUB_ENV
+        echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> $GITHUB_ENV
 
-    - name: Run q chat
+    - name: Build Docker image
       run: |
-       q chat
+        docker build -t amazonq-pipeline .
 
+    - name: Run container and execute q chat
+      env:
+        AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
+        AWS_SESSION_TOKEN: ${{ env.AWS_SESSION_TOKEN }}
+        AWS_REGION: ${{ secrets.AWS_REGION }}
+      run: |
+        docker run --rm \
+          -v $HOME/.aws:/root/.aws:ro \
+          -e AWS_ACCESS_KEY_ID \
+          -e AWS_SECRET_ACCESS_KEY \
+          -e AWS_SESSION_TOKEN \
+          -e AWS_REGION \
+          amazonq-pipeline \
+          q chat
