@@ -45,11 +45,10 @@ jobs:
           }
         }
         EOF
-    - name: Install Amazon Q CLI
+        
+    - name: Download and install Amazon Q CLI
       run: |
-        curl -Lo curl --proto '=https' --tlsv1.2 -sSf "https://desktop-release.q.us-east-1.amazonaws.com/latest/q-x86_64-linux.zip" -o "q.zip"
-        chmod +x q.zip
+        curl --proto '=https' --tlsv1.2 -sSf "https://desktop-release.q.us-east-1.amazonaws.com/latest/q-x86_64-linux.zip" -o "q.zip"
         unzip q.zip
+        chmod +x ./q/install.sh
         ./q/install.sh
-
-    # Add further steps for your MCP usage here
