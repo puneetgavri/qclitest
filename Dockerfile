@@ -19,6 +19,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf "https://desktop-release.q.us-east-1.am
     chmod +x ./q/install.sh && \
     ./q/install.sh --no-confirm --force && \
     rm -rf q.zip q
+ENV PATH="/usr/local/bin:${PATH}"
 
 WORKDIR /root
 
