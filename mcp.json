@@ -7,7 +7,7 @@
       ],
       "env": {
         "FASTMCP_LOG_LEVEL": "ERROR",
-        "AWS_PROFILE": "tfprofile",
+        "AWS_PROFILE": "myprofile",
         "AWS_REGION": "us-east-1"
       },
       "disabled": false,
