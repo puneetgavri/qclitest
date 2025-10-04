@@ -14,15 +14,14 @@ RUN curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2
     rm -rf awscliv2.zip aws
 
 # Download & install Amazon Q CLI
-# After installing Amazon Q CLI
-RUN unzip q.zip && \
+RUN curl --proto '=https' --tlsv1.2 -sSf "https://desktop-release.q.us-east-1.amazonaws.com/latest/q-x86_64-linux.zip" -o "q.zip" && \
+    unzip q.zip && \
     chmod +x ./q/install.sh && \
     ./q/install.sh --no-confirm --force && \
     rm -rf q.zip q && \
     QPATH=$(find / -name q -type f 2>/dev/null | head -n 1) && \
     echo "Q binary installed at: $QPATH" && \
     ln -sf "$QPATH" /usr/local/bin/q
-
 
 WORKDIR /root
 
