@@ -52,3 +52,7 @@ jobs:
         unzip q.zip
         chmod +x ./q/install.sh
         ./q/install.sh --no-confirm
+    - name: Run q chat
+      run: |
+       q chat
+
