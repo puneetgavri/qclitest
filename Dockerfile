@@ -23,6 +23,12 @@ RUN curl --proto '=https' --tlsv1.2 -sSf "https://desktop-release.q.us-east-1.am
     echo "Q binary installed at: $QPATH" && \
     ln -sf "$QPATH" /usr/local/bin/q
 
+# Create directory for MCP config
+RUN mkdir -p /root/.aws/amazonq
+
+# Add your custom mcp.json file (copy from local build context)
+COPY mcp.json /root/.aws/amazonq/mcp.json
+
 WORKDIR /root
 
 CMD ["bash"]
